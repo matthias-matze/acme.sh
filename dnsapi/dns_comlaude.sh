@@ -84,7 +84,7 @@ dns_comlaude_add() {
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  subdomain="${fulldomain%.$_domain}"
+  subdomain="${fulldomain%."$_domain"}"
   [ -z "$subdomain" ] && subdomain="@"
 
   _debug "Root: $_domain"
@@ -120,7 +120,7 @@ dns_comlaude_rm() {
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  subdomain="${fulldomain%.$_domain}"
+  subdomain="${fulldomain%."$_domain"}"
   [ -z "$subdomain" ] && subdomain="@"
 
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
