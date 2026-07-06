@@ -58,8 +58,9 @@ _comlaude_get_root() {
 
     DOMAIN_ID="$(echo "$response" | _egrep_o '"data":\[[^]]*' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
 
-    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"    if [ -n "$DOMAIN_ID" ]; then
-
+    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"    
+	
+	if [ -n "$DOMAIN_ID" ]; then
       _domain="$d"
       _domain_id="$DOMAIN_ID"
       _zone_id="$ZONE_ID"
