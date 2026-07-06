@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 # ===== CONFIG =====
 COMLAUDE_API="https://api.comlaude.com"
@@ -6,63 +6,63 @@ COMLAUDE_API="https://api.comlaude.com"
 ########## AUTH ##########
 
 _comlaude_auth() {
-  if [ -n "${COMLAUDE_ACCESS_TOKEN:-}" ]; then
+_readaccountconf_mutable COMLAUDE_USERNAME
+_readaccountconf_mutable COMLAUDE_PASSWORD
+_readaccountconf_mutable COMLAUDE_API_KEY
+
+export _H1="Content-Type: application/json"
+  if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
     return 0
   fi
 
-  if [ -z "${COMLAUDE_USERNAME:-}" ] || [ -z "${COMLAUDE_PASSWORD:-}" ] || [ -z "${COMLAUDE_API_KEY:-}" ]; then
-    echo "❌ Missing COMLAUDE credentials"
+  if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
+    _err "Missing COMLAUDE credentials"
     return 1
   fi
 
-  echo "🔐 ComLaude auth..."
+  _info "ComLaude auth..."
 
-  AUTH_RESPONSE=$(curl -s -X POST "$COMLAUDE_API/api_login" \
-    -H "Content-Type: application/json" \
-    -d "{
-      \"username\": \"$COMLAUDE_USERNAME\",
-      \"password\": \"$COMLAUDE_PASSWORD\",
-      \"api_key\": \"$COMLAUDE_API_KEY\"
-    }")
+  data="{\"username\":\"$COMLAUDE_USERNAME\",\"password\":\"$COMLAUDE_PASSWORD\",\"api_key\":\"$COMLAUDE_API_KEY\"}"
 
-  COMLAUDE_ACCESS_TOKEN=$(echo "$AUTH_RESPONSE" | jq -r '.data.access_token')
+  response="$(_post "$data" "$COMLAUDE_API/api_login" "" "POST")"
 
-  if [ "$COMLAUDE_ACCESS_TOKEN" = "null" ] || [ -z "$COMLAUDE_ACCESS_TOKEN" ]; then
-    echo "❌ Auth failed"
-    echo "$AUTH_RESPONSE" | jq
+  COMLAUDE_ACCESS_TOKEN="$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+
+  if [ -z "$COMLAUDE_ACCESS_TOKEN" ]; then
+    _err "Auth failed"
+    _debug "$response"
     return 1
   fi
 
   export COMLAUDE_ACCESS_TOKEN
+  _H1=""
 }
+
 
 ########## DOMAIN RESOLUTION ##########
 
 _comlaude_get_root() {
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
   domain="$1"
-
   i=1
-  p=1
 
   while true; do
     d=$(echo "$domain" | cut -d . -f $i-100)
-    if [ -z "$d" ]; then
-      return 1
-    fi
+    [ -z "$d" ] && return 1
 
-    echo "🔎 Checking domain: $d"
+    _debug "Checking domain: $d"
 
-    DOMAIN_RESPONSE=$(curl -g -s \
-      -H "Authorization: Bearer $COMLAUDE_ACCESS_TOKEN" \
-      "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter%5Bname%5D=$d&fields=id,name,active_zone")
+    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter%5Bname%5D=$d&fields=id,name,active_zone")"
+    _H1=""
 
-    DOMAIN_ID=$(echo "$DOMAIN_RESPONSE" | jq -r '.data[0].id')
-    ZONE_ID=$(echo "$DOMAIN_RESPONSE" | jq -r '.data[0].active_zone.id')
+    DOMAIN_ID="$(echo "$response" | _egrep_o '"data":\[[^]]*' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
 
-    if [ "$DOMAIN_ID" != "null" ] && [ -n "$DOMAIN_ID" ]; then
+    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"    if [ -n "$DOMAIN_ID" ]; then
+
+      _domain="$d"
       _domain_id="$DOMAIN_ID"
       _zone_id="$ZONE_ID"
-      _domain="$d"
       return 0
     fi
 
@@ -70,49 +70,39 @@ _comlaude_get_root() {
   done
 }
 
+
 ########## ADD TXT ##########
 
 dns_comlaude_add() {
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
   fulldomain="$1"
   txtvalue="$2"
 
-  echo "➕ Adding TXT for $fulldomain"
+  _info "Adding TXT: $fulldomain"
 
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
   subdomain="${fulldomain%.$_domain}"
+  [ -z "$subdomain" ] && subdomain="@"
 
-  echo "📌 Root domain: $_domain"
-  echo "📌 Subdomain: $subdomain"
+  _debug "Root: $_domain"
+  _debug "Sub: $subdomain"
 
-  # ✅ ===== CHECK EXISTING TXT =====
-  echo "🔎 Checking if TXT already exists..."
+  data="{\"type\":\"TXT\",\"name\":\"$fulldomain\",\"value\":\"$txtvalue\",\"ttl\":60}"
 
-  EXISTING=$(curl -s \
-    -H "Authorization: Bearer $COMLAUDE_ACCESS_TOKEN" \
-    "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records" \
-    | jq -r \
-    ".data[] | select(.type==\"TXT\" and .name==\"$fulldomain\" and .value==\"$txtvalue\") | .id")
+	export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+	export _H2="Content-Type: application/json"
 
-  if [ -n "$EXISTING" ]; then
-    echo "✅ TXT already exists, skipping"
-    return 0
+	response="$(_post "$data" "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
+
+	_H1=""
+	_H2=""
+  if ! echo "$response" | grep -q '"id"'; then
+    _err "Failed to create TXT"
+    _debug "$response"
+    return 1
   fi
-  # ✅ ===== END CHECK =====
-
-  RESPONSE=$(curl -s -X POST \
-    -H "Authorization: Bearer $COMLAUDE_ACCESS_TOKEN" \
-    -H "Content-Type: application/json" \
-    "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records" \
-    -d "{
-      \"type\": \"TXT\",
-      \"name\": \"$fulldomain\",
-      \"value\": \"$txtvalue\",
-      \"ttl\": 60
-    }")
-
-  echo "$RESPONSE" | jq .
 
   return 0
 }
@@ -120,31 +110,47 @@ dns_comlaude_add() {
 ########## REMOVE TXT ##########
 
 dns_comlaude_rm() {
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
   fulldomain="$1"
   txtvalue="$2"
 
-  echo "➖ Removing TXT for $fulldomain"
+  _info "Removing TXT: $fulldomain"
 
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  RECORDS=$(curl -s \
-    -H "Authorization: Bearer $COMLAUDE_ACCESS_TOKEN" \
-    "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")
+  subdomain="${fulldomain%.$_domain}"
+  [ -z "$subdomain" ] && subdomain="@"
 
-  RECORD_ID=$(echo "$RECORDS" | jq -r \
-    ".data[] | select(.type==\"TXT\" and .name==\"$fulldomain\" and .value==\"$txtvalue\") | .id")
+  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+  response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
+  _H1=""
+  
+  echo "$response" | tr '{' '\n' \
+    | grep '"type":[[:space:]]*"TXT"' \
+    | grep "\"name\":[[:space:]]*\"$fulldomain\"" \
+    | grep "\"value\":[[:space:]]*\"$txtvalue\"" \
+    | while read -r line; do
 
-  if [ -z "$RECORD_ID" ]; then
-    echo "⚠️ Record not found"
-    return 0
+  record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+
+    [ -z "$record_id" ] && continue
+
+  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+  url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+
+  del_resp="$(_post "" "$url" "" "DELETE")"
+
+  if echo "$del_resp" | grep -q '"error"'; then
+    _err "Delete failed for $record_id"
+    _debug "$del_resp"
+    _H1=""
+    return 1
   fi
 
-  curl -s -X DELETE \
-    -H "Authorization: Bearer $COMLAUDE_ACCESS_TOKEN" \
-    "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$RECORD_ID"
-
-  echo "✅ TXT removed"
+  _H1=""
+  _debug "Deleted: $record_id"
+  done
 
   return 0
 }
