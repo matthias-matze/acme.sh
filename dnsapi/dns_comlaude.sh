@@ -121,7 +121,7 @@ dns_comlaude_add() {
   _debug "Root: $_domain"
   _debug "Sub: $subdomain"
 
-  data="{\"type\":\"TXT\",\"name\":\"$subdomain.$_domain\",\"value\":\"$txtvalue\",\"ttl\":60}"
+  data="{\"type\":\"TXT\",\"name\":\"$fulldomain\",\"value\":\"$txtvalue\",\"ttl\":60}"
 
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
   export _H2="Content-Type: application/json"
@@ -150,27 +150,29 @@ dns_comlaude_rm() {
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  subdomain="${fulldomain%."$_domain"}"
-  [ -z "$subdomain" ] && subdomain="@"
-
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
   response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
   _H1=""
 
-  echo "$response" | tr '{' '\n' |
-    grep '"type":[[:space:]]*"TXT"' |
-    grep "\"name\":[[:space:]]*\"$fulldomain\"" |
-    grep "\"value\":[[:space:]]*\"$txtvalue\"" |
-    while read -r line; do
+  echo "$response" | _egrep_o '\{[^}]*\}' | while read -r record; do
 
-      record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+    type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+    name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+    value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+    record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
 
-      [ -z "$record_id" ] && continue
+    [ "$type" != "TXT" ] && continue
+    [ "$name" != "$fulldomain" ] && continue
+    [ "$value" != "$txtvalue" ] && continue
+    [ -z "$record_id" ] && continue
+
+    _debug "Deleting record $record_id"
 
       export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
       url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
 
       del_resp="$(_post "" "$url" "" "DELETE")"
+      _H1=""
 
       if echo "$del_resp" | grep -q '"error"'; then
         _err "Delete failed for $record_id"
@@ -179,7 +181,6 @@ dns_comlaude_rm() {
         return 1
       fi
 
-      _H1=""
       _debug "Deleted: $record_id"
     done
 
