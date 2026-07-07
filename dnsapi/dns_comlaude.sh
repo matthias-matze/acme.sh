@@ -154,7 +154,9 @@ dns_comlaude_rm() {
   response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
   _H1=""
 
-  echo "$response" | _egrep_o '\{[^}]*\}' | while read -r record; do
+  records="$(echo "$response" | _egrep_o '\{[^}]*\}')"
+
+  for record in $records; do
 
     type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
     name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
@@ -168,21 +170,21 @@ dns_comlaude_rm() {
 
     _debug "Deleting record $record_id"
 
-      export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-      url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+    url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
 
-      del_resp="$(_post "" "$url" "" "DELETE")"
-      _H1=""
+    del_resp="$(_post "" "$url" "" "DELETE")"
+    _H1=""
 
-      if echo "$del_resp" | grep -q '"error"'; then
-        _err "Delete failed for $record_id"
-        _debug "$del_resp"
-        _H1=""
-        return 1
-      fi
+    if echo "$del_resp" | grep -q '"error"'; then
+      _err "Delete failed for $record_id"
+      _debug "$del_resp"
+      return 1
+    fi
 
-      _debug "Deleted: $record_id"
-    done
+    _debug "Deleted: $record_id"
+
+  done
 
   return 0
 }
