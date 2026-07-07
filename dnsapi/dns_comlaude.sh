@@ -81,9 +81,9 @@ _comlaude_get_root() {
     response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter%5Bname%5D=$d&fields=id,name,active_zone")"
     _H1=""
 
-    DOMAIN_ID="$(echo "$response" | tr '{' '\n' | grep '"id":"' | head -n1 | cut -d'"' -f4)"
+    DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[[^}]*"id":"\([^"]*\)".*/\1/p')"
 
-    ZONE_ID="$(echo "$response" | tr '{' '\n' | grep '"active_zone"' -A2 | grep '"id":"' | head -n1 | cut -d'"' -f4)"
+    ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p')"
 
     _debug "DOMAIN_ID=$DOMAIN_ID"
     _debug "ZONE_ID=$ZONE_ID"
