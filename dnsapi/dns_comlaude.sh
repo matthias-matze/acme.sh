@@ -49,7 +49,13 @@ _comlaude_auth() {
 ########## DOMAIN RESOLUTION ##########
 
 _comlaude_get_root() {
-  _readaccountconf_mutable COMLAUDE_GROUP_ID
+  COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
+
+  if [ -z "$COMLAUDE_GROUP_ID" ]; then
+    _err "Missing COMLAUDE_GROUP_ID"
+    return 1
+  fi
+
   domain="$1"
   i=1
 
@@ -81,7 +87,6 @@ _comlaude_get_root() {
 ########## ADD TXT ##########
 
 dns_comlaude_add() {
-  _readaccountconf_mutable COMLAUDE_GROUP_ID
   fulldomain="$1"
   txtvalue="$2"
 
@@ -117,7 +122,6 @@ dns_comlaude_add() {
 ########## REMOVE TXT ##########
 
 dns_comlaude_rm() {
-  _readaccountconf_mutable COMLAUDE_GROUP_ID
   fulldomain="$1"
   txtvalue="$2"
 
