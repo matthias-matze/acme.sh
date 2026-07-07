@@ -39,10 +39,7 @@ _comlaude_auth() {
 ########## DOMAIN RESOLUTION ##########
 
 _comlaude_get_root() {
-  _readaccountconf_mutable COMLAUDE_GROUP_ID
-
   COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
-
   if [ -z "$COMLAUDE_GROUP_ID" ]; then
     _err "Missing COMLAUDE_GROUP_ID"
     return 1
@@ -105,17 +102,22 @@ _comlaude_get_root() {
 dns_comlaude_add() {
   fulldomain="$1"
   txtvalue="$2"
-  
-  # sauver dès qu'on les a (important pour acmetest)
-  [ -n "$COMLAUDE_USERNAME" ] && _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
-  [ -n "$COMLAUDE_PASSWORD" ] && _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
-  [ -n "$COMLAUDE_API_KEY" ] && _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
-  [ -n "$COMLAUDE_GROUP_ID" ] && _saveaccountconf_mutable COMLAUDE_GROUP_ID "$COMLAUDE_GROUP_ID"
 
-  _readaccountconf_mutable COMLAUDE_USERNAME
-  _readaccountconf_mutable COMLAUDE_PASSWORD
-  _readaccountconf_mutable COMLAUDE_API_KEY
-  _readaccountconf_mutable COMLAUDE_GROUP_ID
+  COMLAUDE_USERNAME="${COMLAUDE_USERNAME:-$(_readaccountconf_mutable COMLAUDE_USERNAME)}"
+  COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$(_readaccountconf_mutable COMLAUDE_PASSWORD)}"
+  COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$(_readaccountconf_mutable COMLAUDE_API_KEY)}"
+  COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
+
+  if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
+    _err "You didn't specify ComLaude credentials (COMLAUDE_USERNAME, COMLAUDE_PASSWORD, COMLAUDE_API_KEY)."
+    return 1
+  fi
+
+  # Sauvegarde uniquement APRÈS validation, jamais avant
+  _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
+  _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
+  _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
+  _saveaccountconf_mutable COMLAUDE_GROUP_ID "$COMLAUDE_GROUP_ID"
 
   _info "Adding TXT: $fulldomain"
 
