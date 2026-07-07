@@ -57,6 +57,15 @@ _comlaude_get_root() {
   fi
 
   domain="$1"
+  
+  # strip wildcard
+  domain="${domain#*.}"
+
+  # strip _acme-challenge
+  domain="${domain#_acme-challenge.}"
+  
+  _debug "Normalized domain: $domain"
+
   i=1
 
   while true; do
