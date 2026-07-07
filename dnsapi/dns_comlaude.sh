@@ -6,22 +6,23 @@ COMLAUDE_API="https://api.comlaude.com"
 ########## AUTH ##########
 
 _comlaude_auth() {
-  # Read from env OR fallback to saved config
-  _readaccountconf_mutable COMLAUDE_USERNAME
-  _readaccountconf_mutable COMLAUDE_PASSWORD
-  _readaccountconf_mutable COMLAUDE_API_KEY
+  # priorité: ENV
+  if [ -z "$COMLAUDE_USERNAME" ]; then
+    _readaccountconf_mutable COMLAUDE_USERNAME
+  fi
+  if [ -z "$COMLAUDE_PASSWORD" ]; then
+    _readaccountconf_mutable COMLAUDE_PASSWORD
+  fi
+  if [ -z "$COMLAUDE_API_KEY" ]; then
+    _readaccountconf_mutable COMLAUDE_API_KEY
+  fi
 
-  COMLAUDE_USERNAME="${COMLAUDE_USERNAME}"
-  COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD}"
-  COMLAUDE_API_KEY="${COMLAUDE_API_KEY}"
-
-  # Validate BEFORE saving
   if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
     _err "Missing COMLAUDE credentials"
     return 1
   fi
 
-  # Persist (important for next calls)
+  # sauvegarde pour appels suivants
   _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
   _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
   _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
@@ -119,7 +120,6 @@ dns_comlaude_add() {
   _readaccountconf_mutable COMLAUDE_PASSWORD
   _readaccountconf_mutable COMLAUDE_API_KEY
   _readaccountconf_mutable COMLAUDE_GROUP_ID
-
 
   _info "Adding TXT: $fulldomain"
 
