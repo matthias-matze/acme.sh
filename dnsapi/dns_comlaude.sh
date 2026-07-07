@@ -60,8 +60,11 @@ _comlaude_get_root() {
   i=1
 
   while true; do
-    d=$(echo "$domain" | cut -d . -f $i-100)
-    [ -z "$d" ] && return 1
+    d=$(printf "%s" "$domain" | cut -d . -f $i-)
+    [ -z "$d" ] && {
+      _debug "No matching domain found for $domain"
+      return 1
+    }
 
     _debug "Checking domain: $d"
 
