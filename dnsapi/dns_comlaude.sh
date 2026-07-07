@@ -24,10 +24,6 @@ _comlaude_auth() {
 
   export _H1="Content-Type: application/json"
 
-  if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
-    return 0
-  fi
-
   _info "ComLaude auth..."
 
   data="{\"username\":\"$COMLAUDE_USERNAME\",\"password\":\"$COMLAUDE_PASSWORD\",\"api_key\":\"$COMLAUDE_API_KEY\"}"
