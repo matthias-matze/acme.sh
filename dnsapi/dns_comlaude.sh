@@ -9,6 +9,9 @@ _comlaude_auth() {
   _readaccountconf_mutable COMLAUDE_USERNAME
   _readaccountconf_mutable COMLAUDE_PASSWORD
   _readaccountconf_mutable COMLAUDE_API_KEY
+  _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
+  _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
+  _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
 
   export _H1="Content-Type: application/json"
   if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
