@@ -131,24 +131,24 @@ dns_comlaude_rm() {
     grep "\"value\":[[:space:]]*\"$txtvalue\"" |
     while read -r line; do
 
-    record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+      record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
 
       [ -z "$record_id" ] && continue
 
-    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-    url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+      export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+      url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
 
-    del_resp="$(_post "" "$url" "" "DELETE")"
+      del_resp="$(_post "" "$url" "" "DELETE")"
 
-    if echo "$del_resp" | grep -q '"error"'; then
-      _err "Delete failed for $record_id"
-      _debug "$del_resp"
+      if echo "$del_resp" | grep -q '"error"'; then
+        _err "Delete failed for $record_id"
+        _debug "$del_resp"
+        _H1=""
+        return 1
+      fi
+
       _H1=""
-      return 1
-    fi
-
-    _H1=""
-    _debug "Deleted: $record_id"
+      _debug "Deleted: $record_id"
     done
 
   return 0
