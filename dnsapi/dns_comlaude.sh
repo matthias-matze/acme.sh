@@ -6,26 +6,10 @@ COMLAUDE_API="https://api.comlaude.com"
 ########## AUTH ##########
 
 _comlaude_auth() {
-  # priorité: ENV
-  if [ -z "$COMLAUDE_USERNAME" ]; then
-    _readaccountconf_mutable COMLAUDE_USERNAME
-  fi
-  if [ -z "$COMLAUDE_PASSWORD" ]; then
-    _readaccountconf_mutable COMLAUDE_PASSWORD
-  fi
-  if [ -z "$COMLAUDE_API_KEY" ]; then
-    _readaccountconf_mutable COMLAUDE_API_KEY
-  fi
-
   if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
     _err "Missing COMLAUDE credentials"
     return 1
   fi
-
-  # sauvegarde pour appels suivants
-  _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
-  _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
-  _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
 
   export _H1="Content-Type: application/json"
 
@@ -116,6 +100,13 @@ _comlaude_get_root() {
 dns_comlaude_add() {
   fulldomain="$1"
   txtvalue="$2"
+  
+  # sauver dès qu'on les a (important pour acmetest)
+  [ -n "$COMLAUDE_USERNAME" ] && _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
+  [ -n "$COMLAUDE_PASSWORD" ] && _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
+  [ -n "$COMLAUDE_API_KEY" ] && _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
+  [ -n "$COMLAUDE_GROUP_ID" ] && _saveaccountconf_mutable COMLAUDE_GROUP_ID "$COMLAUDE_GROUP_ID"
+
   _readaccountconf_mutable COMLAUDE_USERNAME
   _readaccountconf_mutable COMLAUDE_PASSWORD
   _readaccountconf_mutable COMLAUDE_API_KEY
