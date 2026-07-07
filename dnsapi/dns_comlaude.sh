@@ -7,9 +7,13 @@ COMLAUDE_API="https://api.comlaude.com"
 
 _comlaude_auth() {
   # Read from env OR fallback to saved config
-  COMLAUDE_USERNAME="${COMLAUDE_USERNAME:-$(_readaccountconf_mutable COMLAUDE_USERNAME)}"
-  COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$(_readaccountconf_mutable COMLAUDE_PASSWORD)}"
-  COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$(_readaccountconf_mutable COMLAUDE_API_KEY)}"
+  _readaccountconf_mutable COMLAUDE_USERNAME
+  _readaccountconf_mutable COMLAUDE_PASSWORD
+  _readaccountconf_mutable COMLAUDE_API_KEY
+
+  COMLAUDE_USERNAME="${COMLAUDE_USERNAME}"
+  COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD}"
+  COMLAUDE_API_KEY="${COMLAUDE_API_KEY}"
 
   # Validate BEFORE saving
   if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
@@ -45,6 +49,8 @@ _comlaude_auth() {
 ########## DOMAIN RESOLUTION ##########
 
 _comlaude_get_root() {
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
+
   COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
 
   if [ -z "$COMLAUDE_GROUP_ID" ]; then
@@ -109,6 +115,11 @@ _comlaude_get_root() {
 dns_comlaude_add() {
   fulldomain="$1"
   txtvalue="$2"
+  _readaccountconf_mutable COMLAUDE_USERNAME
+  _readaccountconf_mutable COMLAUDE_PASSWORD
+  _readaccountconf_mutable COMLAUDE_API_KEY
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
+
 
   _info "Adding TXT: $fulldomain"
 
@@ -144,6 +155,11 @@ dns_comlaude_add() {
 dns_comlaude_rm() {
   fulldomain="$1"
   txtvalue="$2"
+
+  _readaccountconf_mutable COMLAUDE_USERNAME
+  _readaccountconf_mutable COMLAUDE_PASSWORD
+  _readaccountconf_mutable COMLAUDE_API_KEY
+  _readaccountconf_mutable COMLAUDE_GROUP_ID
 
   _info "Removing TXT: $fulldomain"
 
