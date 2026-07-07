@@ -15,7 +15,7 @@ _comlaude_auth() {
     _err "Missing COMLAUDE credentials"
     return 1
   fi
-
+  sleep 3
   export _H1="Content-Type: application/json"
 
   _info "ComLaude auth..."
