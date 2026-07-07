@@ -121,7 +121,7 @@ dns_comlaude_add() {
   _debug "Root: $_domain"
   _debug "Sub: $subdomain"
 
-  data="{\"type\":\"TXT\",\"name\":\"$fulldomain\",\"value\":\"$txtvalue\",\"ttl\":60}"
+  data="{\"type\":\"TXT\",\"name\":\"$subdomain\",\"value\":\"$txtvalue\",\"ttl\":60}"
 
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
   export _H2="Content-Type: application/json"
