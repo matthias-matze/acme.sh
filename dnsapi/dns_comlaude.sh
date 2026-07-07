@@ -6,21 +6,26 @@ COMLAUDE_API="https://api.comlaude.com"
 ########## AUTH ##########
 
 _comlaude_auth() {
-  _readaccountconf_mutable COMLAUDE_USERNAME
-  _readaccountconf_mutable COMLAUDE_PASSWORD
-  _readaccountconf_mutable COMLAUDE_API_KEY
+  # Read from env OR fallback to saved config
+  COMLAUDE_USERNAME="${COMLAUDE_USERNAME:-$(_readaccountconf_mutable COMLAUDE_USERNAME)}"
+  COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$(_readaccountconf_mutable COMLAUDE_PASSWORD)}"
+  COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$(_readaccountconf_mutable COMLAUDE_API_KEY)}"
+
+  # Validate BEFORE saving
+  if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
+    _err "Missing COMLAUDE credentials"
+    return 1
+  fi
+
+  # Persist (important for next calls)
   _saveaccountconf_mutable COMLAUDE_USERNAME "$COMLAUDE_USERNAME"
   _saveaccountconf_mutable COMLAUDE_PASSWORD "$COMLAUDE_PASSWORD"
   _saveaccountconf_mutable COMLAUDE_API_KEY "$COMLAUDE_API_KEY"
 
   export _H1="Content-Type: application/json"
+
   if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
     return 0
-  fi
-
-  if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
-    _err "Missing COMLAUDE credentials"
-    return 1
   fi
 
   _info "ComLaude auth..."
