@@ -3,6 +3,11 @@
 # ===== CONFIG =====
 COMLAUDE_API="https://api.comlaude.com"
 
+# acmetest compatibility
+COMLAUDE_USERNAME="${COMLAUDE_USERNAME:-$TokenName1}"
+COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$TokenName2}"
+COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$TokenName3}"
+COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$TokenName4}"
 ########## AUTH ##########
 
 _comlaude_auth() {
