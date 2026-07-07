@@ -47,11 +47,13 @@ _comlaude_get_root() {
 
   domain="$1"
 
-  # strip wildcard
-  domain="${domain#*.}"
-
-  # strip _acme-challenge
+  # strip _acme-challenge prefix if present
   domain="${domain#_acme-challenge.}"
+
+  # strip wildcard prefix only if present
+  case "$domain" in
+    \*.*) domain="${domain#*.}" ;;
+  esac
 
   _debug "Normalized domain: $domain"
 
@@ -120,10 +122,10 @@ dns_comlaude_add() {
   _saveaccountconf_mutable COMLAUDE_GROUP_ID "$COMLAUDE_GROUP_ID"
 
   _info "Adding TXT: $fulldomain"
-  _debug "DEBUG COMLAUDE_USERNAME set=[$([ -n "$COMLAUDE_USERNAME" ] && echo yes || echo no)] len=${#COMLAUDE_USERNAME}"
-  _debug "DEBUG COMLAUDE_PASSWORD set=[$([ -n "$COMLAUDE_PASSWORD" ] && echo yes || echo no)] len=${#COMLAUDE_PASSWORD}"
-  _debug "DEBUG COMLAUDE_API_KEY set=[$([ -n "$COMLAUDE_API_KEY" ] && echo yes || echo no)] len=${#COMLAUDE_API_KEY}"
-  _debug "DEBUG COMLAUDE_GROUP_ID set=[$([ -n "$COMLAUDE_GROUP_ID" ] && echo yes || echo no)] len=${#COMLAUDE_GROUP_ID}"  _comlaude_auth || return 1
+  # _debug "DEBUG COMLAUDE_USERNAME set=[$([ -n "$COMLAUDE_USERNAME" ] && echo yes || echo no)] len=${#COMLAUDE_USERNAME}"
+  # _debug "DEBUG COMLAUDE_PASSWORD set=[$([ -n "$COMLAUDE_PASSWORD" ] && echo yes || echo no)] len=${#COMLAUDE_PASSWORD}"
+  # _debug "DEBUG COMLAUDE_API_KEY set=[$([ -n "$COMLAUDE_API_KEY" ] && echo yes || echo no)] len=${#COMLAUDE_API_KEY}"
+  # _debug "DEBUG COMLAUDE_GROUP_ID set=[$([ -n "$COMLAUDE_GROUP_ID" ] && echo yes || echo no)] len=${#COMLAUDE_GROUP_ID}"  _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
   subdomain="${fulldomain%."$_domain"}"
