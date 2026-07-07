@@ -6,11 +6,11 @@ COMLAUDE_API="https://api.comlaude.com"
 ########## AUTH ##########
 
 _comlaude_auth() {
-_readaccountconf_mutable COMLAUDE_USERNAME
-_readaccountconf_mutable COMLAUDE_PASSWORD
-_readaccountconf_mutable COMLAUDE_API_KEY
+  _readaccountconf_mutable COMLAUDE_USERNAME
+  _readaccountconf_mutable COMLAUDE_PASSWORD
+  _readaccountconf_mutable COMLAUDE_API_KEY
 
-export _H1="Content-Type: application/json"
+  export _H1="Content-Type: application/json"
   if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
     return 0
   fi
@@ -38,7 +38,6 @@ export _H1="Content-Type: application/json"
   _H1=""
 }
 
-
 ########## DOMAIN RESOLUTION ##########
 
 _comlaude_get_root() {
@@ -58,19 +57,18 @@ _comlaude_get_root() {
 
     DOMAIN_ID="$(echo "$response" | _egrep_o '"data":\[[^]]*' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
 
-    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"    
-	
-	if [ -n "$DOMAIN_ID" ]; then
+    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+
+    if [ -n "$DOMAIN_ID" ]; then
       _domain="$d"
       _domain_id="$DOMAIN_ID"
       _zone_id="$ZONE_ID"
       return 0
     fi
 
-    i=$((i+1))
+    i=$((i + 1))
   done
 }
-
 
 ########## ADD TXT ##########
 
@@ -92,13 +90,13 @@ dns_comlaude_add() {
 
   data="{\"type\":\"TXT\",\"name\":\"$fulldomain\",\"value\":\"$txtvalue\",\"ttl\":60}"
 
-	export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-	export _H2="Content-Type: application/json"
+  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+  export _H2="Content-Type: application/json"
 
-	response="$(_post "$data" "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
+  response="$(_post "$data" "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
 
-	_H1=""
-	_H2=""
+  _H1=""
+  _H2=""
   if ! echo "$response" | grep -q '"id"'; then
     _err "Failed to create TXT"
     _debug "$response"
@@ -126,32 +124,32 @@ dns_comlaude_rm() {
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
   response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
   _H1=""
-  
-  echo "$response" | tr '{' '\n' \
-    | grep '"type":[[:space:]]*"TXT"' \
-    | grep "\"name\":[[:space:]]*\"$fulldomain\"" \
-    | grep "\"value\":[[:space:]]*\"$txtvalue\"" \
-    | while read -r line; do
 
-  record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+  echo "$response" | tr '{' '\n' |
+    grep '"type":[[:space:]]*"TXT"' |
+    grep "\"name\":[[:space:]]*\"$fulldomain\"" |
+    grep "\"value\":[[:space:]]*\"$txtvalue\"" |
+    while read -r line; do
 
-    [ -z "$record_id" ] && continue
+    record_id="$(echo "$line" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
 
-  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-  url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+      [ -z "$record_id" ] && continue
 
-  del_resp="$(_post "" "$url" "" "DELETE")"
+    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+    url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
 
-  if echo "$del_resp" | grep -q '"error"'; then
-    _err "Delete failed for $record_id"
-    _debug "$del_resp"
+    del_resp="$(_post "" "$url" "" "DELETE")"
+
+    if echo "$del_resp" | grep -q '"error"'; then
+      _err "Delete failed for $record_id"
+      _debug "$del_resp"
+      _H1=""
+      return 1
+    fi
+
     _H1=""
-    return 1
-  fi
-
-  _H1=""
-  _debug "Deleted: $record_id"
-  done
+    _debug "Deleted: $record_id"
+    done
 
   return 0
 }
