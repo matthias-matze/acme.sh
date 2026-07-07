@@ -78,13 +78,11 @@ _comlaude_get_root() {
     _debug "Checking domain: $d"
 
     export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter%5Bname%5D=$d&fields=id,name,active_zone")"
+    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
     _H1=""
 
-    DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[[^}]*"id":"\([^"]*\)".*/\1/p')"
-
-    ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p')"
-
+    DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[\([^]]*\)\].*/\1/p' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+    ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n1)"
     _debug "DOMAIN_ID=$DOMAIN_ID"
     _debug "ZONE_ID=$ZONE_ID"
 
