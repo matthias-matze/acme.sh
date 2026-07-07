@@ -57,13 +57,13 @@ _comlaude_get_root() {
   fi
 
   domain="$1"
-  
+
   # strip wildcard
   domain="${domain#*.}"
 
   # strip _acme-challenge
   domain="${domain#_acme-challenge.}"
-  
+
   _debug "Normalized domain: $domain"
 
   i=1
@@ -81,11 +81,19 @@ _comlaude_get_root() {
     response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter%5Bname%5D=$d&fields=id,name,active_zone")"
     _H1=""
 
-    DOMAIN_ID="$(echo "$response" | _egrep_o '"data":\[[^]]*' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+    DOMAIN_ID="$(echo "$response" | tr '{' '\n' | grep '"id":"' | head -n1 | cut -d'"' -f4)"
 
-    ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":[^{]*{[^}]*}' | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+    ZONE_ID="$(echo "$response" | tr '{' '\n' | grep '"active_zone"' -A2 | grep '"id":"' | head -n1 | cut -d'"' -f4)"
 
-    if [ -n "$DOMAIN_ID" ]; then
+    _debug "DOMAIN_ID=$DOMAIN_ID"
+    _debug "ZONE_ID=$ZONE_ID"
+
+    if [ -z "$DOMAIN_ID" ]; then
+      _debug "Response was: $response"
+      _debug "DOMAIN_ID not found"
+    fi
+
+    if [ -n "$DOMAIN_ID" ] && [ -n "$ZONE_ID" ]; then
       _domain="$d"
       _domain_id="$DOMAIN_ID"
       _zone_id="$ZONE_ID"
