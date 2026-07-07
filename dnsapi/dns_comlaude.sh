@@ -11,29 +11,47 @@ COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$TokenName4}"
 ########## AUTH ##########
 
 _comlaude_auth() {
+  # Réutilise le token déjà obtenu dans cette session, s'il existe
+  if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
+    _debug "Reusing existing ComLaude token"
+    return 0
+  fi
+
   if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
     _err "Missing COMLAUDE credentials"
     return 1
   fi
-  sleep 3
+
   export _H1="Content-Type: application/json"
-
-  _info "ComLaude auth..."
-
   data="{\"username\":\"$COMLAUDE_USERNAME\",\"password\":\"$COMLAUDE_PASSWORD\",\"api_key\":\"$COMLAUDE_API_KEY\"}"
 
-  response="$(_post "$data" "$COMLAUDE_API/api_login" "" "POST")"
+  retry=0
+  max_retry=3
 
-  COMLAUDE_ACCESS_TOKEN="$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+  while [ "$retry" -lt "$max_retry" ]; do
+    _info "ComLaude auth... (attempt $((retry + 1))/$max_retry)"
 
-  if [ -z "$COMLAUDE_ACCESS_TOKEN" ]; then
-    _err "Auth failed"
-    _debug "$response"
-    return 1
-  fi
+    response="$(_post "$data" "$COMLAUDE_API/api_login" "" "POST")"
+    COMLAUDE_ACCESS_TOKEN="$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
 
-  export COMLAUDE_ACCESS_TOKEN
+    if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
+      export COMLAUDE_ACCESS_TOKEN
+      _H1=""
+      return 0
+    fi
+
+    _debug "Auth attempt $((retry + 1)) failed: $response"
+    retry=$((retry + 1))
+
+    if [ "$retry" -lt "$max_retry" ]; then
+      _info "Retrying auth in 5 seconds..."
+      sleep 5
+    fi
+  done
+
+  _err "Auth failed after $max_retry attempts"
   _H1=""
+  return 1
 }
 
 ########## DOMAIN RESOLUTION ##########
@@ -52,7 +70,7 @@ _comlaude_get_root() {
 
   # strip wildcard prefix only if present
   case "$domain" in
-    \*.*) domain="${domain#*.}" ;;
+  \*.*) domain="${domain#*.}" ;;
   esac
 
   _debug "Normalized domain: $domain"
@@ -125,8 +143,8 @@ dns_comlaude_add() {
   # _debug "DEBUG COMLAUDE_USERNAME set=[$([ -n "$COMLAUDE_USERNAME" ] && echo yes || echo no)] len=${#COMLAUDE_USERNAME}"
   # _debug "DEBUG COMLAUDE_PASSWORD set=[$([ -n "$COMLAUDE_PASSWORD" ] && echo yes || echo no)] len=${#COMLAUDE_PASSWORD}"
   # _debug "DEBUG COMLAUDE_API_KEY set=[$([ -n "$COMLAUDE_API_KEY" ] && echo yes || echo no)] len=${#COMLAUDE_API_KEY}"
-  # _debug "DEBUG COMLAUDE_GROUP_ID set=[$([ -n "$COMLAUDE_GROUP_ID" ] && echo yes || echo no)] len=${#COMLAUDE_GROUP_ID}"  
-  
+  # _debug "DEBUG COMLAUDE_GROUP_ID set=[$([ -n "$COMLAUDE_GROUP_ID" ] && echo yes || echo no)] len=${#COMLAUDE_GROUP_ID}"
+
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
