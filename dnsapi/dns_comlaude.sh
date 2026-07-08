@@ -185,8 +185,11 @@ dns_comlaude_rm() {
   response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
   _H1=""
 
-  records="$(echo "$response" | _egrep_o '\{[^}]*\}')"
+  records="$(echo "$response" | sed 's/},{/}\n{/g' | tr -d '\n' | sed 's/}{/}\n{/g')"
 
+  _debug "Raw response: $response"
+  _debug "Parsed records count: $(echo "$records" | wc -l)"
+  deleted_count=0
   for record in $records; do
 
     type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
@@ -206,7 +209,7 @@ dns_comlaude_rm() {
 
     del_resp="$(_post "" "$url" "" "DELETE")"
     _H1=""
-
+    deleted_count=$((deleted_count + 1))
     if echo "$del_resp" | grep -q '"error"'; then
       _err "Delete failed for $record_id"
       _debug "$del_resp"
@@ -216,6 +219,9 @@ dns_comlaude_rm() {
     _debug "Deleted: $record_id"
 
   done
+  if [ "$deleted_count" -eq 0 ]; then
+    _err "No matching TXT record found to delete for $fulldomain / $txtvalue"
+  fi
 
   return 0
 }
