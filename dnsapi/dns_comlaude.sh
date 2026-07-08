@@ -82,6 +82,8 @@ _comlaude_get_root() {
 
     while [ "$retry" -lt "$max_retry" ]; do
       export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+      _debug "COMLAUDE_GROUP_ID at request time: [$COMLAUDE_GROUP_ID]"
+      _debug "Full URL: $COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone"
       response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
       _H1=""
 
