@@ -31,8 +31,6 @@ _comlaude_auth() {
   while [ "$retry" -lt "$max_retry" ]; do
     _info "ComLaude auth... (attempt $((retry + 1))/$max_retry)"
 
-    _debug "DEBUG_LOGIN_LEN username=${#COMLAUDE_USERNAME} password=${#COMLAUDE_PASSWORD} apikey=${#COMLAUDE_API_KEY}"
-
     response="$(_post "$data" "$COMLAUDE_API/api_login" "" "POST")"
     COMLAUDE_ACCESS_TOKEN="$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
 
