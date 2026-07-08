@@ -66,7 +66,7 @@ _comlaude_get_root() {
 
   i=1
   while true; do
-    d=$(printf "%s" "$domain" | cut -d . -f $i-)
+    d=$(printf "%s" "$domain" | cut -d . -f "$i-")
     [ -z "$d" ] && {
       _debug "No matching domain found for $domain"
       return 1
@@ -74,26 +74,40 @@ _comlaude_get_root() {
 
     _debug "Checking domain: $d"
 
-    # retry loop pour absorber les 404 transitoires de l'API ComLaude
     retry=0
+    max_retry=3
     DOMAIN_ID=""
     ZONE_ID=""
-    while [ "$retry" -lt 3 ]; do
+
+    while [ "$retry" -lt "$max_retry" ]; do
       export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
       response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
       _H1=""
 
       _debug "RAW response for $d (try $((retry + 1))): $response"
 
-      if echo "$response" | grep -q '"data":\[\]'; then
+      # Erreur réseau / réponse vide -> retry
+      if [ -z "$response" ]; then
         retry=$((retry + 1))
-        [ "$retry" -lt 3 ] && sleep 2
+        [ "$retry" -lt "$max_retry" ] && sleep 2
         continue
       fi
 
-      DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[\([^]]*\)\].*/\1/p' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
-      ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n1)"
-      break
+      # Domaine réellement absent -> pas la peine de retry, on remonte d'un niveau
+      if echo "$response" | grep -q '"data":\[\]'; then
+        break
+      fi
+
+      # Extraction fiable via _egrep_o (un match par occurrence, pas de capture gourmande)
+      DOMAIN_ID="$(echo "$response" | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+      ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":\{"id":"[^"]*"' | _egrep_o '"id":"[^"]*"$' | cut -d':' -f2 | tr -d '"')"
+
+      if [ -n "$DOMAIN_ID" ] && [ -n "$ZONE_ID" ]; then
+        break
+      fi
+
+      retry=$((retry + 1))
+      [ "$retry" -lt "$max_retry" ] && sleep 2
     done
 
     _debug "DOMAIN_ID=$DOMAIN_ID"
@@ -109,7 +123,6 @@ _comlaude_get_root() {
     i=$((i + 1))
   done
 }
-
 ########## ADD TXT ##########
 
 dns_comlaude_add() {
@@ -181,66 +194,38 @@ dns_comlaude_rm() {
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  deleted_count=0
-  page=1
+  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+  _encoded_name="$(printf '%s' "$fulldomain" | _url_encode)"
+  _encoded_value="$(printf '%s' "$txtvalue" | _url_encode)"
+  url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records?filter[type]=TXT&filter[name]=$_encoded_name&filter[value]=$_encoded_value"
+  response="$(_get "$url")"
+  _H1=""
 
-  while true; do
-    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records?page=$page")"
-    _H1=""
+  _debug "Filtered records response: $response"
 
-    _debug "Fetching page $page"
-    _debug "RAW records page $page: $response"
+  # On prend le premier "id" top-level de la réponse (le record lui-même,
+  # toujours en première position dans chaque objet de data[])
+  record_id="$(echo "$response" | _egrep_o '"data":\[\{"id":"[^"]*"' | _egrep_o '"[^"]*"$' | tr -d '"')"
 
-    # Supprime le sous-objet "zone":{...{...}...} (1 niveau d'imbrication: zone.domain)
-    # pour ne plus avoir de "{"id" parasites à l'intérieur d'un record.
-    records_clean="$(echo "$response" | sed -E 's/"zone":\{[^{}]*\{[^{}]*\}[^{}]*\}//g')"
-    records="$(echo "$records_clean" | sed 's/{"id"/\n{"id"/g' | tail -n +2)"
-
-    _old_ifs="$IFS"
-    IFS='
-'
-    for record in $records; do
-      IFS="$_old_ifs"
-
-      type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
-      name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
-      value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
-      record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
-
-      _debug "Record parsed: type=$type name=$name value=$value id=$record_id"
-
-      [ "$type" != "TXT" ] && continue
-      [ "$name" != "$fulldomain" ] && continue
-      [ "$value" != "$txtvalue" ] && continue
-      [ -z "$record_id" ] && continue
-
-      _debug "Deleting record $record_id"
-      export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-      url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
-      del_resp="$(_post "" "$url" "" "DELETE")"
-      _H1=""
-
-      if echo "$del_resp" | grep -q '"error"'; then
-        _err "Delete failed for $record_id"
-        _debug "$del_resp"
-        continue
-      fi
-
-      deleted_count=$((deleted_count + 1))
-    done
-    IFS="$_old_ifs"
-
-    has_next="$(echo "$response" | _egrep_o '"next":"[^"]*"')"
-    [ -z "$has_next" ] && break
-    page=$((page + 1))
-  done
-
-  if [ "$deleted_count" -eq 0 ]; then
+  if [ -z "$record_id" ]; then
     _err "No matching TXT record found to delete for $fulldomain / $txtvalue"
     return 1
   fi
 
-  _info "Deleted $deleted_count record(s)"
+  _debug "Deleting record $record_id"
+
+  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+  del_url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+  del_resp="$(_post "" "$del_url" "" "DELETE")"
+  _H1=""
+
+  if echo "$del_resp" | grep -q '"error"'; then
+    _err "Delete failed for $record_id"
+    _debug "$del_resp"
+    return 1
+  fi
+
+  _info "Deleted record $record_id"
   return 0
 }
+
