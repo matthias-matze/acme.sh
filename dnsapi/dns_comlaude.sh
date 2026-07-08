@@ -190,14 +190,22 @@ dns_comlaude_rm() {
     _H1=""
 
     _debug "Fetching page $page"
+    _debug "RAW records page $page: $response"
 
-    records="$(echo "$response" | _egrep_o '\{[^}]*\}')"
+    records="$(echo "$response" | sed 's/{"id"/\n{"id"/g' | tail -n +2)"
 
+    _old_ifs="$IFS"
+    IFS='
+'
     for record in $records; do
-      type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-      name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-      value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-      record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+      IFS="$_old_ifs"
+
+      type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+      name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+      value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+      record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
+
+      _debug "Record parsed: type=$type name=$name value=$value id=$record_id"
 
       [ "$type" != "TXT" ] && continue
       [ "$name" != "$fulldomain" ] && continue
@@ -213,13 +221,13 @@ dns_comlaude_rm() {
       if echo "$del_resp" | grep -q '"error"'; then
         _err "Delete failed for $record_id"
         _debug "$del_resp"
-        return 1
+        continue
       fi
 
       deleted_count=$((deleted_count + 1))
     done
+    IFS="$_old_ifs"
 
-    # vérifie s'il y a une page suivante
     has_next="$(echo "$response" | _egrep_o '"next":"[^"]*"')"
     [ -z "$has_next" ] && break
     page=$((page + 1))
