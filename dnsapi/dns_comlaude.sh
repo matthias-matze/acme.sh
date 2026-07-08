@@ -57,11 +57,7 @@ _comlaude_get_root() {
   fi
 
   domain="$1"
-
-  # strip _acme-challenge prefix if present
   domain="${domain#_acme-challenge.}"
-
-  # strip wildcard prefix only if present
   case "$domain" in
   \*.*) domain="${domain#*.}" ;;
   esac
@@ -69,7 +65,6 @@ _comlaude_get_root() {
   _debug "Normalized domain: $domain"
 
   i=1
-
   while true; do
     d=$(printf "%s" "$domain" | cut -d . -f $i-)
     [ -z "$d" ] && {
@@ -79,27 +74,30 @@ _comlaude_get_root() {
 
     _debug "Checking domain: $d"
 
-    export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
-    _H1=""
+    # retry loop pour absorber les 404 transitoires de l'API ComLaude
+    retry=0
+    DOMAIN_ID=""
+    ZONE_ID=""
+    while [ "$retry" -lt 3 ]; do
+      export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+      response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
+      _H1=""
 
-    _debug "RAW response for $d: $response"
+      _debug "RAW response for $d (try $((retry + 1))): $response"
 
-    if echo "$response" | grep -q '"data":\[\]'; then
-      _debug "Domain not found: $d"
-      i=$((i + 1))
-      continue
-    fi
+      if echo "$response" | grep -q '"data":\[\]'; then
+        retry=$((retry + 1))
+        [ "$retry" -lt 3 ] && sleep 2
+        continue
+      fi
 
-    DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[\([^]]*\)\].*/\1/p' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
-    ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n1)"
+      DOMAIN_ID="$(echo "$response" | sed -n 's/.*"data":[^[]*\[\([^]]*\)\].*/\1/p' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p')"
+      ZONE_ID="$(echo "$response" | sed -n 's/.*"active_zone":[^{]*{[^}]*"id":"\([^"]*\)".*/\1/p' | head -n1)"
+      break
+    done
+
     _debug "DOMAIN_ID=$DOMAIN_ID"
     _debug "ZONE_ID=$ZONE_ID"
-
-    if [ -z "$DOMAIN_ID" ]; then
-      _debug "Response was: $response"
-      _debug "DOMAIN_ID not found"
-    fi
 
     if [ -n "$DOMAIN_ID" ] && [ -n "$ZONE_ID" ]; then
       _domain="$d"
