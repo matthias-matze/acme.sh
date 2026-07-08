@@ -192,7 +192,10 @@ dns_comlaude_rm() {
     _debug "Fetching page $page"
     _debug "RAW records page $page: $response"
 
-    records="$(echo "$response" | sed 's/{"id"/\n{"id"/g' | tail -n +2)"
+    # Supprime le sous-objet "zone":{...{...}...} (1 niveau d'imbrication: zone.domain)
+    # pour ne plus avoir de "{"id" parasites à l'intérieur d'un record.
+    records_clean="$(echo "$response" | sed -E 's/"zone":\{[^{}]*\{[^{}]*\}[^{}]*\}//g')"
+    records="$(echo "$records_clean" | sed 's/{"id"/\n{"id"/g' | tail -n +2)"
 
     _old_ifs="$IFS"
     IFS='
