@@ -11,47 +11,40 @@ COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$TokenName4}"
 ########## AUTH ##########
 
 _comlaude_auth() {
-  # Réutilise le token déjà obtenu dans cette session, s'il existe
-  if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
-    _debug "Reusing existing ComLaude token"
+  _debug "Checking cached ComLaude token"
+
+  # essaie de charger le token en cache depuis account.conf
+  if [ -z "$COMLAUDE_ACCESS_TOKEN" ]; then
+    COMLAUDE_ACCESS_TOKEN="$(_readaccountconf_mutable COMLAUDE_ACCESS_TOKEN)"
+    COMLAUDE_TOKEN_EXPIRY="$(_readaccountconf_mutable COMLAUDE_TOKEN_EXPIRY)"
+  fi
+
+  _now=$(_time)
+  if [ -n "$COMLAUDE_ACCESS_TOKEN" ] && [ -n "$COMLAUDE_TOKEN_EXPIRY" ] && [ "$_now" -lt "$COMLAUDE_TOKEN_EXPIRY" ]; then
+    _debug "Using cached ComLaude token (valid ${COMLAUDE_TOKEN_EXPIRY} > ${_now})"
     return 0
   fi
 
-  if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
-    _err "Missing COMLAUDE credentials"
+  _info "ComLaude auth..."
+  body="{\"username\":\"$COMLAUDE_USERNAME\",\"password\":\"$COMLAUDE_PASSWORD\",\"api_key\":\"$COMLAUDE_API_KEY\"}"
+  response="$(_post "$body" "https://api.comlaude.com/api_login" "" "POST" "application/json")"
+
+  if ! _contains "$response" "access_token"; then
+    _err "Auth failed: $response"
     return 1
   fi
 
-  export _H1="Content-Type: application/json"
-  data="{\"username\":\"$COMLAUDE_USERNAME\",\"password\":\"$COMLAUDE_PASSWORD\",\"api_key\":\"$COMLAUDE_API_KEY\"}"
+  COMLAUDE_ACCESS_TOKEN=$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d'"' -f4)
+  # Ajuste selon la durée réelle de vie du token retournée par l'API (souvent "expires_in" en secondes)
+  _expires_in=$(echo "$response" | _egrep_o '"expires_in":[0-9]*' | cut -d: -f2)
+  [ -z "$_expires_in" ] && _expires_in=3000  # fallback si l'API ne donne pas cette info
 
-  retry=0
-  max_retry=3
+  COMLAUDE_TOKEN_EXPIRY=$(( $(_time) + _expires_in - 60 ))  # marge de sécurité de 60s
 
-  while [ "$retry" -lt "$max_retry" ]; do
-    _info "ComLaude auth... (attempt $((retry + 1))/$max_retry)"
+  _saveaccountconf_mutable COMLAUDE_ACCESS_TOKEN "$COMLAUDE_ACCESS_TOKEN"
+  _saveaccountconf_mutable COMLAUDE_TOKEN_EXPIRY "$COMLAUDE_TOKEN_EXPIRY"
 
-    response="$(_post "$data" "$COMLAUDE_API/api_login" "" "POST")"
-    COMLAUDE_ACCESS_TOKEN="$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-
-    if [ -n "$COMLAUDE_ACCESS_TOKEN" ]; then
-      export COMLAUDE_ACCESS_TOKEN
-      _H1=""
-      return 0
-    fi
-
-    _debug "Auth attempt $((retry + 1)) failed: $response"
-    retry=$((retry + 1))
-
-    if [ "$retry" -lt "$max_retry" ]; then
-      _info "Retrying auth in 5 seconds..."
-      sleep 5
-    fi
-  done
-
-  _err "Auth failed after $max_retry attempts"
-  _H1=""
-  return 1
+  return 0
 }
 
 ########## DOMAIN RESOLUTION ##########
