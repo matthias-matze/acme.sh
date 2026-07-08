@@ -83,6 +83,8 @@ _comlaude_get_root() {
     response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
     _H1=""
 
+    _debug "RAW response for $d: $response"
+
     if echo "$response" | grep -q '"data":\[\]'; then
       _debug "Domain not found: $d"
       i=$((i + 1))
