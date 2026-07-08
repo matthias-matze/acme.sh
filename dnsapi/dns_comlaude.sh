@@ -181,47 +181,55 @@ dns_comlaude_rm() {
   _comlaude_auth || return 1
   _comlaude_get_root "$fulldomain" || return 1
 
-  export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-  response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records")"
-  _H1=""
-
-  records="$(echo "$response" | sed 's/},{/}\n{/g' | tr -d '\n' | sed 's/}{/}\n{/g')"
-
-  _debug "Raw response: $response"
-  _debug "Parsed records count: $(echo "$records" | wc -l)"
   deleted_count=0
-  for record in $records; do
+  page=1
 
-    type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-    name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-    value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-    record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
-
-    [ "$type" != "TXT" ] && continue
-    [ "$name" != "$fulldomain" ] && continue
-    [ "$value" != "$txtvalue" ] && continue
-    [ -z "$record_id" ] && continue
-
-    _debug "Deleting record $record_id"
-
+  while true; do
     export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-    url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
-
-    del_resp="$(_post "" "$url" "" "DELETE")"
+    response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records?page=$page")"
     _H1=""
-    deleted_count=$((deleted_count + 1))
-    if echo "$del_resp" | grep -q '"error"'; then
-      _err "Delete failed for $record_id"
-      _debug "$del_resp"
-      return 1
-    fi
 
-    _debug "Deleted: $record_id"
+    _debug "Fetching page $page"
 
+    records="$(echo "$response" | _egrep_o '\{[^}]*\}')"
+
+    for record in $records; do
+      type="$(echo "$record" | _egrep_o '"type":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+      name="$(echo "$record" | _egrep_o '"name":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+      value="$(echo "$record" | _egrep_o '"value":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+      record_id="$(echo "$record" | _egrep_o '"id":"[^"]*"' | cut -d':' -f2 | tr -d '"')"
+
+      [ "$type" != "TXT" ] && continue
+      [ "$name" != "$fulldomain" ] && continue
+      [ "$value" != "$txtvalue" ] && continue
+      [ -z "$record_id" ] && continue
+
+      _debug "Deleting record $record_id"
+      export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
+      url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_zone_id/records/$record_id"
+      del_resp="$(_post "" "$url" "" "DELETE")"
+      _H1=""
+
+      if echo "$del_resp" | grep -q '"error"'; then
+        _err "Delete failed for $record_id"
+        _debug "$del_resp"
+        return 1
+      fi
+
+      deleted_count=$((deleted_count + 1))
+    done
+
+    # vérifie s'il y a une page suivante
+    has_next="$(echo "$response" | _egrep_o '"next":"[^"]*"')"
+    [ -z "$has_next" ] && break
+    page=$((page + 1))
   done
+
   if [ "$deleted_count" -eq 0 ]; then
     _err "No matching TXT record found to delete for $fulldomain / $txtvalue"
+    return 1
   fi
 
+  _info "Deleted $deleted_count record(s)"
   return 0
 }
