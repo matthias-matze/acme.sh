@@ -33,6 +33,7 @@ _comlaude_auth() {
     _err "Auth failed: $response"
     return 1
   fi
+  sleep 3
 
   COMLAUDE_ACCESS_TOKEN=$(echo "$response" | _egrep_o '"access_token":"[^"]*"' | cut -d'"' -f4)
   # Ajuste selon la durée réelle de vie du token retournée par l'API (souvent "expires_in" en secondes)
