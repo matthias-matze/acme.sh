@@ -75,9 +75,10 @@ _comlaude_get_root() {
     _debug "Checking domain: $d"
 
     retry=0
-    max_retry=3
+    max_retry=5
     DOMAIN_ID=""
     ZONE_ID=""
+    _not_found=0
 
     while [ "$retry" -lt "$max_retry" ]; do
       export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
@@ -93,12 +94,21 @@ _comlaude_get_root() {
         continue
       fi
 
-      # Domaine réellement absent -> pas la peine de retry, on remonte d'un niveau
+      # 404 "identifier_not_found" -> souvent transitoire côté API ComLaude, on retry
+      if echo "$response" | grep -q '"status_code":404' && echo "$response" | grep -q "identifier_not_found"; then
+        _debug "Transient 404 for $d, retrying ($((retry + 1))/$max_retry)..."
+        retry=$((retry + 1))
+        [ "$retry" -lt "$max_retry" ] && sleep 2
+        continue
+      fi
+
+      # Domaine réellement absent (réponse propre 200, data vide) -> pas de retry, on remonte d'un niveau
       if echo "$response" | grep -q '"data":\[\]'; then
+        _not_found=1
         break
       fi
 
-      # Extraction fiable via _egrep_o (un match par occurrence, pas de capture gourmande)
+      # Extraction fiable via _egrep_o
       DOMAIN_ID="$(echo "$response" | _egrep_o '"id":"[^"]*"' | head -n1 | cut -d':' -f2 | tr -d '"')"
       ZONE_ID="$(echo "$response" | _egrep_o '"active_zone":\{"id":"[^"]*"' | _egrep_o '"id":"[^"]*"$' | cut -d':' -f2 | tr -d '"')"
 
