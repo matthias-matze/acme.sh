@@ -73,41 +73,50 @@ _comlaude_get_root() {
       return 1
     }
 
+    # On ne teste pas les niveaux qui ne peuvent structurellement pas être
+    # un domaine enregistré : le TLD seul (pas de point restant après cut).
+    case "$d" in
+    *.*) : ;;
+    *)
+      _debug "Skipping bare TLD candidate: $d"
+      i=$((i + 1))
+      continue
+      ;;
+    esac
+
     _debug "Checking domain: $d"
 
     retry=0
-    max_retry=5
+    max_retry=3           # uniquement pour erreurs réseau/transport
     DOMAIN_ID=""
     ZONE_ID=""
-    _not_found=0
 
     while [ "$retry" -lt "$max_retry" ]; do
       export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-      _debug "COMLAUDE_GROUP_ID at request time: [$COMLAUDE_GROUP_ID]"
       _debug "Full URL: $COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone"
       response="$(_get "$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/domains?filter[name]=$d&fields=id,name,active_zone")"
       _H1=""
 
       _debug "RAW response for $d (try $((retry + 1))): $response"
 
-      # Erreur réseau / réponse vide -> retry
+      # Réponse vide -> vrai souci réseau, on retry
       if [ -z "$response" ]; then
         retry=$((retry + 1))
         [ "$retry" -lt "$max_retry" ] && sleep 2
         continue
       fi
 
-      # 404 "identifier_not_found" -> souvent transitoire côté API ComLaude, on retry
-      if echo "$response" | grep -q '"status_code":404' && echo "$response" | grep -q "identifier_not_found"; then
-        _debug "Transient 404 for $d, retrying ($((retry + 1))/$max_retry)..."
-        retry=$((retry + 1))
-        [ "$retry" -lt "$max_retry" ] && sleep 2
-        continue
+      # 404 -> domaine non trouvé à ce niveau. Pas de retry : on remonte
+      # directement d'un cran dans la hiérarchie (comportement attendu,
+      # pas une erreur transitoire de l'API).
+      if echo "$response" | grep -q '"status_code":404'; then
+        _debug "404 for $d, moving to next level (not retrying)"
+        break
       fi
 
-      # Domaine réellement absent (réponse propre 200, data vide) -> pas de retry, on remonte d'un niveau
+      # Domaine réellement absent (réponse 200, data vide) -> on remonte
       if echo "$response" | grep -q '"data":\[\]'; then
-        _not_found=1
+        _debug "Empty data for $d, moving to next level"
         break
       fi
 
@@ -119,6 +128,7 @@ _comlaude_get_root() {
         break
       fi
 
+      # Réponse 200 mais data mal formée / pas d'id -> retry transport
       retry=$((retry + 1))
       [ "$retry" -lt "$max_retry" ] && sleep 2
     done
