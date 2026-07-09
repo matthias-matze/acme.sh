@@ -3,14 +3,14 @@
 # shellcheck disable=SC2034
 dns_comlaude_info='comlaude.com
 Site: comlaude.com
-Docs: github.com/acmesh-official/acme.sh/wiki/dnsapi2#dns_comlaude(To update when build OK)
+Docs: github.com/acmesh-official/acme.sh/wiki/dnsapi2#dns_comlaude
 Options:
  COMLAUDE_USERNAME User account
  COMLAUDE_PASSWORD.User password
  COMLAUDE_API_KEY generated API key
  COMLAUDE_GROUP_ID Group ID in comlaude user profile
  Get it from the https://www.comlaude.com
-Issues: github.com/acmesh-official/acme.sh/issues/<to update>
+Issues: github.com/acmesh-official/acme.sh/issues/7112
 '
 # ===== CONFIG =====
 COMLAUDE_API="https://api.comlaude.com"
@@ -248,4 +248,3 @@ dns_comlaude_rm() {
   _info "Deleted record $_comlaude_record_id"
   return 0
 }
-
