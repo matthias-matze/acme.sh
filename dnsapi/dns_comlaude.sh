@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+# shellcheck disable=SC2034
 dns_comlaude_info='comlaude.com
 Site: comlaude.com
 Docs: github.com/acmesh-official/acme.sh/wiki/dnsapi2#dns_comlaude(To update when build OK)
@@ -45,7 +46,7 @@ _comlaude_auth() {
   COMLAUDE_ACCESS_TOKEN=$(echo "$_comlaude_response" | _egrep_o '"access_token":"[^"]*"' | cut -d'"' -f4)
   # store expiracy from api reply l'API ("expires_in" in seconds)
   _comlaude_expires_in=$(echo "$_comlaude_response" | _egrep_o '"expires_in":[0-9]*' | cut -d: -f2)
-  [ -z "$_comlaude_expires_in" ] && _comlaude_expires_in=3000  # fallback if no info
+  [ -z "$_comlaude_expires_in" ] && _comlaude_expires_in=3000 # fallback if no info
 
   COMLAUDE_TOKEN_EXPIRY=$(( $(_time) + _comlaude_expires_in - 60 ))  # margin of 60s to secure renew
 
@@ -86,7 +87,7 @@ _comlaude_get_root() {
     *.*) : ;;
     *)
       _debug "Skipping bare TLD candidate: $_comlaude_d"
-      _comlaude__comlaude_i=$((_comlaude_i + 1))
+      _comlaude_i=$((_comlaude_i + 1))
       continue
       ;;
     esac
@@ -94,7 +95,7 @@ _comlaude_get_root() {
     _debug "Checking domain: $_comlaude_d"
 
     _comlaude_retry=0
-    _comlaude_max_retry=3           # to avoid network errors
+    _comlaude_max_retry=3 # to avoid network errors
     _comlaude_DOM_ID=""
     _comlaude_Z_ID=""
 
@@ -156,12 +157,11 @@ _comlaude_get_root() {
 dns_comlaude_add() {
   fulldomain="$1"
   txtvalue="$2"
-  
+
   COMLAUDE_USERNAME="${COMLAUDE_USERNAME:-$(_readaccountconf_mutable COMLAUDE_USERNAME)}"
   COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$(_readaccountconf_mutable COMLAUDE_PASSWORD)}"
   COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$(_readaccountconf_mutable COMLAUDE_API_KEY)}"
   COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
-
 
   if [ -z "$COMLAUDE_USERNAME" ] || [ -z "$COMLAUDE_PASSWORD" ] || [ -z "$COMLAUDE_API_KEY" ]; then
     _err "You didn't specify ComLaude credentials (COMLAUDE_USERNAME, COMLAUDE_PASSWORD, COMLAUDE_API_KEY)."
@@ -208,7 +208,6 @@ dns_comlaude_rm() {
   COMLAUDE_PASSWORD="${COMLAUDE_PASSWORD:-$(_readaccountconf_mutable COMLAUDE_PASSWORD)}"
   COMLAUDE_API_KEY="${COMLAUDE_API_KEY:-$(_readaccountconf_mutable COMLAUDE_API_KEY)}"
   COMLAUDE_GROUP_ID="${COMLAUDE_GROUP_ID:-$(_readaccountconf_mutable COMLAUDE_GROUP_ID)}"
-
 
   _info "Removing TXT: $fulldomain"
 
