@@ -48,7 +48,7 @@ _comlaude_auth() {
   _comlaude_expires_in=$(echo "$_comlaude_response" | _egrep_o '"expires_in":[0-9]*' | cut -d: -f2)
   [ -z "$_comlaude_expires_in" ] && _comlaude_expires_in=3000 # fallback if no info
 
-  COMLAUDE_TOKEN_EXPIRY=$(( $(_time) + _comlaude_expires_in - 60 ))  # margin of 60s to secure renew
+  COMLAUDE_TOKEN_EXPIRY=$(( $(_time) + _comlaude_expires_in - 60 )) # margin of 60s to secure renew
 
   _saveaccountconf_mutable COMLAUDE_ACCESS_TOKEN "$COMLAUDE_ACCESS_TOKEN"
   _saveaccountconf_mutable COMLAUDE_TOKEN_EXPIRY "$COMLAUDE_TOKEN_EXPIRY"
