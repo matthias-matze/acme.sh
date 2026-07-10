@@ -6,7 +6,7 @@ Site: comlaude.com
 Docs: github.com/acmesh-official/acme.sh/wiki/dnsapi2#dns_comlaude
 Options:
  COMLAUDE_USERNAME User account
- COMLAUDE_PASSWORD.User password
+ COMLAUDE_PASSWORD User password
  COMLAUDE_API_KEY generated API key
  COMLAUDE_GROUP_ID Group ID in comlaude user profile
  Get it from the https://www.comlaude.com
@@ -40,8 +40,6 @@ _comlaude_auth() {
     _err "Auth failed: $_comlaude_response"
     return 1
   fi
-  #Prevent api timeout
-  sleep 3
 
   COMLAUDE_ACCESS_TOKEN=$(echo "$_comlaude_response" | _egrep_o '"access_token":"[^"]*"' | cut -d'"' -f4)
   # store expiracy from api reply l'API ("expires_in" in seconds)
@@ -215,9 +213,9 @@ dns_comlaude_rm() {
   _comlaude_get_root "$fulldomain" || return 1
 
   export _H1="Authorization: Bearer $COMLAUDE_ACCESS_TOKEN"
-  _encoded_name="$(printf '%s' "$fulldomain" | _url_encode)"
-  _encoded_value="$(printf '%s' "$txtvalue" | _url_encode)"
-  _comlaude_url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_comlaude_zone_id/records?filter[type]=TXT&filter[name]=$_encoded_name&filter[value]=$_encoded_value"
+  _comlaude_encoded_name="$(printf '%s' "$fulldomain" | _url_encode)"
+  _comlaude_encoded_value="$(printf '%s' "$txtvalue" | _url_encode)"
+  _comlaude_url="$COMLAUDE_API/groups/$COMLAUDE_GROUP_ID/zones/$_comlaude_zone_id/records?filter[type]=TXT&filter[name]=$_comlaude_encoded_name&filter[value]=$_comlaude_encoded_value"
   _comlaude_response="$(_get "$_comlaude_url")"
   _H1=""
 
@@ -229,7 +227,7 @@ dns_comlaude_rm() {
 
   if [ -z "$_comlaude_record_id" ]; then
     _err "No matching TXT record found to delete for $fulldomain / $txtvalue"
-    return 1
+    return 0
   fi
 
   _debug "Deleting record $_comlaude_record_id"
