@@ -226,7 +226,7 @@ dns_comlaude_rm() {
   _comlaude_record_id="$(echo "$_comlaude_response" | _egrep_o '"data":\[\{"id":"[^"]*"' | _egrep_o '"[^"]*"$' | tr -d '"')"
 
   if [ -z "$_comlaude_record_id" ]; then
-    _err "No matching TXT record found to delete for $fulldomain / $txtvalue"
+    _info "No matching TXT record found to delete for $fulldomain / $txtvalue"
     return 0
   fi
 
